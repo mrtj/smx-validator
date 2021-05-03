@@ -1,0 +1,118 @@
+Comment: >-
+  A state machine that orchestrates a cross validated training with SageMaker.
+StartAt: Bootstrap Training
+States:
+
+  Bootstrap Training:
+    Comment: >-
+      Configure global parameters for the training of all folds, for example
+      the training name prefix.
+    Type: Task
+    Resource: ${BootstrapperFunctionArn}
+    Next: Split Dataset
+
+  Split Dataset:
+    Comment: Splits the dataset into cross validation folds.
+    Type: Task
+    Resource: ${DatasetSplitterFunctionArn}
+    Next: Train All Folds
+
+  Train All Folds:
+    Comment: >-
+      Train the crossvalidation folds in parallel. Set MaxConcurrency to the
+      number of available training instances.
+    Type: Map
+    MaxConcurrency: 2
+    InputPath: $
+    ItemsPath: $.splits
+    Parameters:
+      split.$: $$.Map.Item.Value
+      job_config.$: $.job_config
+      training.$: $.training
+    Iterator:
+      StartAt: Prepare Fold Input
+      States:
+
+        Prepare Fold Input:
+          Comment: >-
+            This lambda function customizes / adjusts the hyperparameter 
+            template and other parameters of the current split.
+          Type: Task
+          Resource: ${SplitPreparerFunctionArn}
+          Next: Train model on Single Fold
+
+        Train model on Single Fold:
+          Comment: >-
+            Train a single fold using the CreateTrainingJob SageMaker 
+            task type.
+          Type: Task
+          Resource: arn:aws:states:::sagemaker:createTrainingJob.sync
+          Parameters:
+            AlgorithmSpecification.$: $.training.AlgorithmSpecification
+            HyperParameters.$: $.split.HyperParameters
+            TrainingJobName.$: $.split.TrainingJobName
+            StoppingCondition.$: $.training.StoppingCondition
+            ResourceConfig.$: $.training.ResourceConfig
+            RoleArn: ${SageMakerExecutionRoleArn}
+            EnableManagedSpotTraining: true
+            OutputDataConfig:
+              S3OutputPath.$: States.Format('{}models/', $.job_config.output_prefix)
+            InputDataConfig:
+            - DataSource:
+                S3DataSource:
+                  S3DataDistributionType: FullyReplicated
+                  S3DataType: AugmentedManifestFile
+                  S3Uri.$: $.split.train
+                  AttributeNames: [ source-ref, class ]
+              ChannelName: train
+              ContentType: application/x-recordio; label-format=class-id
+              InputMode: Pipe
+              RecordWrapperType: RecordIO
+            - DataSource:
+                S3DataSource:
+                  S3DataDistributionType: FullyReplicated
+                  S3DataType: AugmentedManifestFile
+                  S3Uri.$: $.split.validation
+                  AttributeNames: [ source-ref, class ]
+              ChannelName: validation
+              ContentType: application/x-recordio; label-format=class-id
+              InputMode: Pipe
+              RecordWrapperType: RecordIO
+            ExperimentConfig:
+              ExperimentName.$: $.job_config.experiment_name
+              TrialName.$: $.job_config.trial_name
+              TrialComponentDisplayName.$: States.Format('TrainingJob-{}', $.split.fold_name)
+            Tags.$: $.split.tags
+          ResultPath: $.output.training_info
+          OutputPath: $.output
+          Retry:
+          - ErrorEquals: [ SageMaker.AmazonSageMakerException ]
+            IntervalSeconds: 30
+            MaxAttempts: 3
+            BackoffRate: 2
+          - ErrorEquals: [ SageMaker.ResourceLimitExceededException ]
+            IntervalSeconds: 60
+            MaxAttempts: 6
+            BackoffRate: 2
+          Next: Get Training Info
+
+        Get Training Info:
+          Comment: >-
+            This lambda function gets training results and other information
+            after the training has finished
+          Type: Task
+          Resource: ${TrainingInfoGetterFunctionArn}
+          OutputPath: $.training_info
+          Next: Wait for deprovisioning
+
+        Wait for deprovisioning:
+          Comment: >-
+            The training instances might not be immediately free when 
+            SageMaker reports the "training succeeded" event, so wait 
+            to ensure the instances are available.
+          Type: Wait
+          Seconds: 10
+          End: true
+
+    ResultPath: $.splits
+    End: true

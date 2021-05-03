@@ -1,0 +1,295 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: >-
+  SAM Template for SMX-Validator
+
+Parameters:
+  InputBucketName:
+    Type: String
+    Description: >-
+      The name of the input S3 bucket where the dataset can be found. The 
+      job_config.input_path runtime parameter should refer to a path in this 
+      bucket.
+  OutputBucketName:
+    Type: String
+    Description: >-
+      The name of the output S3 bucket where the cross validation folds will 
+      be written. The job_config.output_prefix runtime parameter should refer 
+      to a path in this bucket.
+
+Globals:
+  Function:
+    Tags:
+      application: smx_validator
+
+Resources:
+
+  CrossValidatorStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Description: >
+      The state machine coordinating the training of cross-validation folds.
+    Properties:
+      DefinitionUri: statemachine/smx-validator.asl.yaml
+      DefinitionSubstitutions:
+        BootstrapperFunctionArn: !GetAtt BootstrapperFunction.Arn
+        DatasetSplitterFunctionArn: !GetAtt DatasetSplitterFunction.Arn
+        SplitPreparerFunctionArn: !GetAtt SplitPreparerFunction.Arn
+        SageMakerExecutionRoleArn: !GetAtt SageMakerExecutionRole.Arn
+        TrainingInfoGetterFunctionArn: !GetAtt TrainingInfoGetterFunction.Arn
+      Policies: # What can the State Machine do on your behalf?
+        - Statement:
+            # Invoke specific lambda functions defined in this template
+            - Sid: LambdaInvokePolicy
+              Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - Fn::Sub:
+                    - arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${functionName}*
+                    - { functionName: !Ref BootstrapperFunction }
+                - Fn::Sub:
+                    - arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${functionName}*
+                    - { functionName: !Ref DatasetSplitterFunction }
+                - Fn::Sub:
+                    - arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${functionName}*
+                    - { functionName: !Ref SplitPreparerFunction }
+                - Fn::Sub:
+                    - arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${functionName}*
+                    - { functionName: !Ref TrainingInfoGetterFunction }
+            # Start/stop SageMaker training jobs if their name starts crossvalidator-*
+            - Sid: SageMakerTrainingJobStartStopPolicy
+              Effect: Allow
+              Action:
+                - sagemaker:CreateTrainingJob
+                - sagemaker:DescribeTrainingJob
+                - sagemaker:StopTrainingJob
+              Resource:
+                - !Sub arn:${AWS::Partition}:sagemaker:${AWS::Region}:${AWS::AccountId}:training-job/crossvalidator-*
+            # Post and read events on EventBridge to signal end of SageMaker training
+            - Sid: PutSageMakerTrainingEventsPolicy
+              Effect: Allow
+              Action:
+                - events:PutTargets
+                - events:PutRule
+                - events:DescribeRule
+              Resource: 
+                - !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventsForSageMakerTrainingJobsRule
+            # List SageMaker tags
+            - Sid: SageMakerListTagPolicy
+              Effect: Allow
+              Action:
+                - sagemaker:ListTags
+              Resource: "*"
+            # Pass execution role to SageMaker service
+            - Sid: PassRoleToSageMakerPolicy
+              Effect: Allow
+              Action: 
+                - iam:PassRole
+              Resource: !GetAtt SageMakerExecutionRole.Arn 
+              Condition:
+                StringEquals:
+                  iam:PassedToService: sagemaker.amazonaws.com
+      Tags:
+        application: sagemaker_crossvalidator
+
+  BootstrapperFunction:
+    Type: AWS::Serverless::Function
+    Description: >-
+      This lambda function boostraps the sagemaker crossvalidation training 
+      process.
+    Properties:
+      CodeUri: functions/bootstrapper
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Timeout: 60
+      Layers:
+        - !Ref SageMakerLayer
+        - !Ref JsonSchemaLayer
+        - !Ref ResourcesLayer
+      Policies:
+        - Statement:
+          - Sid: SageMakerExperimentsManagerPolicy
+            Effect: Allow
+            Action:
+              - sagemaker:ListExperiments
+              - sagemaker:DescribeExperiment
+              - sagemaker:CreateExperiment
+              - sagemaker:UpdateExperiment
+              - sagemaker:DeleteExperiment
+              - sagemaker:ListTrials
+              - sagemaker:DescribeTrial
+              - sagemaker:CreateTrial
+              - sagemaker:UpdateTrial
+              - sagemaker:DeleteTrial
+              - sagemaker:ListTrialComponents
+              - sagemaker:DescribeTrialComponent
+              - sagemaker:CreateTrialComponent
+              - sagemaker:UpdateTrialComponent
+              - sagemaker:DeleteTrialComponent
+            Resource: "*"
+
+  DatasetSplitterFunction:
+    Type: AWS::Serverless::Function
+    Description: >
+      This lambda function splits the input dataset into cross-validation 
+      folds.
+    Properties:
+      CodeUri: functions/dataset_splitter/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Timeout: 300
+      MemorySize: 512
+      Layers:
+        - !Ref NumpyLayer
+        - !Ref S3fsLayer
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref InputBucketName
+        - S3WritePolicy:
+            BucketName: !Ref OutputBucketName
+
+  SplitPreparerFunction:
+    Type: AWS::Serverless::Function
+    Description: >
+      This lambda function compiles the hyperparameter template and other 
+      parameters of the current split.
+    Properties:
+      CodeUri: functions/split_preparer
+      Handler: app.lambda_handler
+      Runtime: python3.8
+
+  TrainingInfoGetterFunction:
+    Type: AWS::Serverless::Function
+    Description: >
+      This lambda function gets training results and other information
+      after the training has finished.
+    Properties:
+      CodeUri: ../common/functions/training_info_getter/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Timeout: 10
+      Layers:
+        - !Ref CommonUtilsLayer
+      Policies:
+        - Statement:
+          - Sid: SageMakerDescribeTrainingJobPolicy
+            Effect: Allow
+            Action:
+              - sagemaker:DescribeTrainingJob
+            Resource:
+              - !Sub arn:${AWS::Partition}:sagemaker:${AWS::Region}:${AWS::AccountId}:training-job/crossvalidator-*
+
+  NumpyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Description: Lambda layer containing the numpy library.
+    Properties:
+      ContentUri: layers/numpy
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: python3.8
+
+  S3fsLayer:
+    Type: AWS::Serverless::LayerVersion
+    Description: Lambda layer containing the s3fs library.
+    Properties:
+      ContentUri: layers/s3fs
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: python3.8
+
+  SageMakerLayer:
+    Type: AWS::Serverless::LayerVersion
+    Description: Lambda layer containing the sagemaker and smexperiments libraries.
+    Properties:
+      ContentUri: layers/sagemaker
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: python3.8
+
+  JsonSchemaLayer:
+    Type: AWS::Serverless::LayerVersion
+    Description: Lambda layer containing the jsonschema library.
+    Properties:
+      ContentUri: layers/jsonschema
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: python3.8
+
+  ResourcesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Description: Lambda layer containing resources.
+    Properties:
+      ContentUri: resources
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: makefile
+
+  CommonUtilsLayer:
+    Type: AWS::Serverless::LayerVersion
+    Description: Lambda layer containing common utils
+    Properties:
+      ContentUri: ../common/layers/utils
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: python3.8
+
+  SageMakerExecutionRole:
+    Type: AWS::IAM::Role
+    Description: Execution role for the SageMaker training job.
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "sagemaker.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+      Path: "/service-role/"
+      Policies:
+        - PolicyName: SageMakerS3InputBucketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetObjectVersion
+                  - s3:GetLifecycleConfiguration
+                Resource:
+                  - !Sub 'arn:aws:s3:::${InputBucketName}'
+                  - !Sub 'arn:aws:s3:::${InputBucketName}/*'
+        - PolicyName: SageMakerS3OutputBucketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:PutLifecycleConfiguration
+                Resource:
+                  - !Sub 'arn:aws:s3:::${OutputBucketName}'
+                  - !Sub 'arn:aws:s3:::${OutputBucketName}/*'
+      Tags:
+        - Key: application
+          Value: sagemaker_crossvalidator
+
+Outputs:
+  CrossValidatorStateMachineArn:
+    Description: SageMaker Crossvalidator State Machine ARN
+    Value: !Ref CrossValidatorStateMachine
+  CrossValidatorStateMachineRoleArn:
+    Description: IAM Role created for Cross Validator State Machine
+    Value: !GetAtt CrossValidatorStateMachineRole.Arn

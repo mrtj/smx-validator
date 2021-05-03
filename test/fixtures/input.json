@@ -1,0 +1,56 @@
+{
+    "job_config": {
+        "output_prefix": "s3://sagemaker-eu-west-1-984967808247/sagemaker-crossvalidator/",
+        "input_path": "s3://dataset.remotair.com/manifest/mainfest_20210407-194100.jsonl",
+        "name": "visualclean",
+        "experiment": "visualclean-crossvalidated",
+        "tags": [
+            { 
+                "Key": "project",
+                "Value": "visualclean"
+            }
+        ]
+    },
+    "crossvalidation": {
+        "n_splits": 5,
+        "random_state": 42
+    },
+    "training": {
+        "HyperParameters_template": {
+            "num_classes": "${num_classes}",
+            "num_training_samples": "${num_training_samples}",
+            "image_shape": "3,224,224",
+            "resize": "336",
+            "augmentation_type": "crop",
+            "num_layers": "34",
+            "use_pretrained_model": "1",
+            "precision_dtype": "float32",
+            "mini_batch_size": "128",
+            "epochs": "5",
+            "learning_rate": "0.0005",
+            "lr_scheduler_step": "10,20,30,40",
+            "lr_scheduler_factor": "0.1",
+            "optimizer": "adam",
+            "eps": "0.0001",
+            "beta_1": "0.5",
+            "beta_2": "0.5",
+            "early_stopping": "true",
+            "early_stopping_min_epochs": "10",
+            "early_stopping_patience": "5",
+            "early_stopping_tolerance": "0"
+        },
+        "AlgorithmSpecification": {
+            "TrainingImage": "685385470294.dkr.ecr.eu-west-1.amazonaws.com/image-classification:1",
+            "TrainingInputMode": "Pipe"
+        },
+        "StoppingCondition": {
+            "MaxRuntimeInSeconds": 3600,
+            "MaxWaitTimeInSeconds": 7200
+        },
+        "ResourceConfig": {
+            "InstanceCount": 1,
+            "InstanceType": "ml.p3.2xlarge",
+            "VolumeSizeInGB": 10
+        }
+    }
+}

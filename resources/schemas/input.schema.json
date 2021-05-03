@@ -1,0 +1,230 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://github.com/mrtj/sagemaker-crossvalidator/doc/input.schema.json",
+    "type": "object",
+    "title": "SageMaker Cross-validator state machine input",
+    "description": "The input of the SageMaker Cross-validator state machine.",
+    "required": [
+        "job_config",
+        "crossvalidation",
+        "training"
+    ],
+    "properties": {
+        "job_config": {
+            "$id": "#/properties/job_config",
+            "type": "object",
+            "title": "Job configuration",
+            "description": "This section defines parameters that are global for the cross-validated training job.",
+            "examples": [
+                {
+                    "output_prefix": "s3://bucket/output_prefix",
+                    "input_path": "s3://bucket/path/input.jsonl",
+                    "name": "my_training",
+                    "experiment": "my_training_experiment",
+                    "tags": [
+                        {
+                            "Key": "project",
+                            "Value": "my_project"
+                        }
+                    ]
+                }
+            ],
+            "required": [
+                "name",
+                "input_path",
+                "output_prefix"
+            ],
+            "properties": {
+                "name": {
+                    "$id": "#/properties/job_config/properties/name",
+                    "type": "string",
+                    "title": "Name of the cross-validated training job",
+                    "description": "An identifying name of the training job. Will be suffixed with the current timestamp to generate the names of the SageMaker training jobs."
+                },
+                "input_path": {
+                    "$id": "#/properties/job_config/properties/input_path",
+                    "type": "string",
+                    "title": "Path of the input file",
+                    "description": "The S3 URL of the input text file. This text file will be sliced into cross-validated folds that will be fed to the training container. The bucket in this path should match the `InputBucketName` CloudFormation parameter."
+                },
+                "output_prefix": {
+                    "$id": "#/properties/job_config/properties/output_prefix",
+                    "type": "string",
+                    "title": "Output S3 prefix of the job",
+                    "description": "Cross-validation fold inputs as well as all trained models will be written under this S3 URL prefix. The bucket in the prefix should match the `OutputBucketName` CloudFormation parameter."
+                },
+                "experiment": {
+                    "$id": "#/properties/job_config/properties/experiment",
+                    "type": "string",
+                    "title": "SageMaker Experiment name",
+                    "description": "The name of the SageMaker Experiment that will be used to track the hyperparameters and the metrics of the training jobs. If the experiment is not existing yet, it will be created."
+                },
+                "tags": {
+                    "$id": "#/properties/job_config/properties/tags",
+                    "type": "array",
+                    "title": "Training job tags",
+                    "description": "All tags defined in this section will be propageted to the SageMaker training jobs created by the cross-validator.",
+                    "additionalItems": false,
+                    "items": {
+                        "$id": "#/properties/job_config/properties/tags/items",
+                        "type": "object",
+                        "title": "A single tag entry",
+                        "description": "AWS API style tag entry.",
+                        "required": [
+                            "Key",
+                            "Value"
+                        ],
+                        "properties": {
+                            "Key": {
+                                "$id": "#/properties/job_config/properties/tags/items/properties/Key",
+                                "type": "string",
+                                "title": "The Key of the tag",
+                                "description": "The Key of the tag"
+                            },
+                            "Value": {
+                                "$id": "#/properties/job_config/properties/tags/items/properties/Value",
+                                "type": "string",
+                                "title": "The Value of the tag",
+                                "description": "The Value of the tag"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "crossvalidation": {
+            "$id": "#/properties/crossvalidation",
+            "type": "object",
+            "title": "Cross-validation parameters",
+            "description": "This section defines parameters regarding the k-fold cross-validation dataset generation.",
+            "examples": [
+                {
+                    "n_splits": 5,
+                    "random_state": 42
+                }
+            ],
+            "required": [
+                "n_splits",
+                "random_state"
+            ],
+            "properties": {
+                "n_splits": {
+                    "$id": "#/properties/crossvalidation/properties/n_splits",
+                    "type": "integer",
+                    "minimum": 2,
+                    "title": "Number of splits",
+                    "description": "The number of k-fold splits to be generated. It is also equal to the number of training jobs that will be launched.",
+                    "default": 5
+                },
+                "random_state": {
+                    "$id": "#/properties/crossvalidation/properties/random_state",
+                    "type": "integer",
+                    "minimum": 0,
+                    "title": "Random state",
+                    "description": "The initial state (seed) of the random number generator used to generate the cross-validated splits. Specifying the same number and the same input file will generate the same splits.",
+                    "default": 42
+                }
+            },
+            "additionalProperties": false
+        },
+        "training": {
+            "$id": "#/properties/training",
+            "type": "object",
+            "title": "Training parameters",
+            "description": "This section provides a template for the SageMaker training job parameters. Most of these parameters will be directly mapped to the appropiate fields of the SageMaker [CreateTrainingJob](https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_CreateTrainingJob.html) API request.",
+            "required": [
+                "HyperParameters_template",
+                "AlgorithmSpecification",
+                "StoppingCondition",
+                "ResourceConfig"
+            ],
+            "examples": [
+                {
+                    "HyperParameters_template": {
+                        "num_classes": "${num_classes}",
+                        "learning_rate": "0.0005"
+                    },
+                    "AlgorithmSpecification": {
+                        "TrainingImage": "685385470294.dkr.ecr.eu-west-1.amazonaws.com/image-classification:1",
+                        "TrainingInputMode": "Pipe"
+                    },
+                    "StoppingCondition": {
+                        "MaxRuntimeInSeconds": 3600,
+                        "MaxWaitTimeInSeconds": 7200
+                    },
+                    "ResourceConfig": {
+                        "InstanceCount": 1,
+                        "InstanceType": "ml.p3.2xlarge",
+                        "VolumeSizeInGB": 10
+                    }
+                }
+            ],
+            "properties": {
+                "HyperParameters_template": {
+                    "$id": "#/properties/training/properties/hyperparameters_template",
+                    "type": "object",
+                    "title": "Hyperparameters template",
+                    "description": "Hyperparameters to be passed to the SageMaker training job. A simple template substitution will be performed in order to set split-specific hyperparameters. All hyperparameters, including numeric and bool types should be converted to string.",
+                    "properties": {},
+                    "examples": [
+                        {
+                            "num_classes": "${num_classes}",
+                            "num_training_samples": "${num_training_samples}",
+                            "string_hyperparam": "foo",
+                            "numeric_hyperparam": "42",
+                            "boolean_hyperparam": "true"
+                        }
+                    ],
+                    "additionalProperties": true
+                },
+                "AlgorithmSpecification": {
+                    "$id": "#/properties/training/properties/algorithm_specification",
+                    "type": "object",
+                    "title": "Algorithm specification",
+                    "description": "The algorithm specification of the SageMaker training jobs. This section will be directly mapped to the [AlgorithmSpecification](https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_AlgorithmSpecification.html) field of the CreateTrainingJob request.",
+                    "properties": {},
+                    "examples": [
+                        {
+                            "TrainingImage": "685385470294.dkr.ecr.eu-west-1.amazonaws.com/image-classification:1",
+                            "TrainingInputMode": "Pipe"
+                        }
+                    ],
+                    "additionalProperties": true
+                },
+                "StoppingCondition": {
+                    "$id": "#/properties/training/properties/stopping_condition",
+                    "type": "object",
+                    "title": "Stopping condition",
+                    "description": "The stopping condition of the SageMaker training jobs. This section will be directly mapped to the [StoppingCondition](https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_StoppingCondition.html) field of the CreateTrainingJob request.",
+                    "properties": {},
+                    "examples": [
+                        {
+                            "MaxRuntimeInSeconds": 3600,
+                            "MaxWaitTimeInSeconds": 7200
+                        }
+                    ],
+                    "additionalProperties": true
+                },
+                "ResourceConfig": {
+                    "$id": "#/properties/training/properties/resource_config",
+                    "type": "object",
+                    "title": "Resource configuration",
+                    "description": "The resource configuraiton of the SageMaker training jobs. This section will be directly mapped to the [ResourceConfig](https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_ResourceConfig.html) field of the CreateTrainingJob request.",
+                    "properties": {},
+                    "examples": [
+                        {
+                            "InstanceCount": 1,
+                            "InstanceType": "ml.p3.2xlarge",
+                            "VolumeSizeInGB": 10
+                        }
+                    ],
+                    "additionalProperties": true
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}
