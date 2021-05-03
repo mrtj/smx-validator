@@ -1,6 +1,6 @@
 # SMX-Validator
 
-> Orchestrate k-fold cross validated training jobs on Amazon Web Services infrastructure.
+> Orchestrate k-fold cross validated SageMaker training jobs on Amazon Web Services infrastructure.
 
 ## Introduction
 

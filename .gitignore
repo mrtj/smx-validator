@@ -1,0 +1,4 @@
+.vscode
+tests/fixtures
+__pycache__
+samconfig.toml
