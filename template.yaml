@@ -4,6 +4,21 @@ Transform: AWS::Serverless-2016-10-31
 Description: >-
   SAM Template for SMX-Validator
 
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: SMX-Validator
+    Description: >-
+      Orchestrate k-fold cross validated SageMaker training jobs on Amazon 
+      Web Services infrastructure.
+    Author: mrtj
+    SpdxLicenseId: Apache-2.0
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels: ['SageMaker', 'machine-learning', 'StepFunctions']
+    HomePageUrl: https://github.com/mrtj/smx-validator
+    SemanticVersion: 0.1.0
+    SourceCodeUrl: https://github.com/mrtj/smx-validator
+
 Parameters:
   InputBucketName:
     Type: String
