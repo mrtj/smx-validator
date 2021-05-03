@@ -180,7 +180,7 @@ Resources:
       This lambda function gets training results and other information
       after the training has finished.
     Properties:
-      CodeUri: ../common/functions/training_info_getter/
+      CodeUri: functions/training_info_getter/
       Handler: app.lambda_handler
       Runtime: python3.8
       Timeout: 10
@@ -249,7 +249,7 @@ Resources:
     Type: AWS::Serverless::LayerVersion
     Description: Lambda layer containing common utils
     Properties:
-      ContentUri: ../common/layers/utils
+      ContentUri: layers/utils
       CompatibleRuntimes:
         - python3.8
     Metadata:
