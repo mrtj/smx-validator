@@ -152,11 +152,21 @@ You should specify a well defined json file as an input of the state machine exe
 }
 ```
 
+### Output
+
+SMX-Validator will report detailed information about each training job executed. In the Step Functions execution output json you can find the following fields:
+
+- `job_config`: Parameters of generic for the whole cross-validated training job, like job name, SageMaker Experiment and Trial name, job input and output data.
+- `crossvalidation`: Cross-validation parameters, like number of splits used in the job.
+- `training`: The template structures used to create the training jobs.
+- `splits`: This array contains the detailed results of each training job. It corresponds to the output of the DescribeTrainingJob SageMaker API call. Other than the exact training job inputs you can find the training time and duration, billable seconds, final metrics value and output artifacts location in this structure.
+
 ## Project structure
 
 This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders:
 
 - `functions` - Code for the application's Lambda functions to manage the cross-validated SageMaker training jobs
+- `layers` - Lambda layers containing function dependencies and common utils for the functions.
 - `statemachines` - Definition for the state machine that orchestrates the cross-validated trainings
 - `template.yaml` - A template that defines the application's AWS resources.
 
