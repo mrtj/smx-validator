@@ -18,9 +18,9 @@ SMX-Validator uses [AWS Step Functions](https://aws.amazon.com/step-functions/) 
 
 All SageMaker training jobs launched by the cross-validator will be organized under [SageMaker Experiments](https://docs.aws.amazon.com/sagemaker/latest/dg/experiments.html) so you can easily review the resulting metrics. You can also set your custom tags to the training jobs.
 
-## Deploying SMX-Validator from AWS Serverless Application Repository
+## Deploying SMX-Validator from AWS Serverless Application Repository (SAR)
 
-SMX-Validator is published on AWS Serverless Application Repository. The simplest way to deploy the application is clicking the "Deploy" button on the [application page](https://serverlessrepo.aws.amazon.com/applications/eu-west-1/043458249825/SMX-Validator). You will be asked to fill out two parameters before deploying the application:
+[SMX-Validator is published on AWS SAR](https://serverlessrepo.aws.amazon.com/applications/eu-west-1/043458249825/SMX-Validator). The simplest way to deploy the application is clicking the "Deploy" button on the application page. You will be asked to fill out two parameters before deploying the application:
 
 * `InputBucketName`: The name of the input bucket. Deploying this application will create an IAM role that allows reading files from this bucket. The input text file should be placed in this bucket.
 * `OutputBucketName`: The name of the output bucket. Deploying this application will create an IAM role that allows writing files in this bucket. The cross-validated training and validation inputs and the training results will be written to this bucket.
