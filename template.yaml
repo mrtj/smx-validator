@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
 Description: >-
@@ -8,7 +8,7 @@ Metadata:
   AWS::ServerlessRepo::Application:
     Name: SMX-Validator
     Description: >-
-      Orchestrate k-fold cross validated SageMaker training jobs on Amazon 
+      Orchestrate k-fold cross validated SageMaker training jobs on Amazon
       Web Services infrastructure.
     Author: mrtj
     SpdxLicenseId: Apache-2.0
@@ -23,14 +23,14 @@ Parameters:
   InputBucketName:
     Type: String
     Description: >-
-      The name of the input S3 bucket where the dataset can be found. The 
-      job_config.input_path runtime parameter should refer to a path in this 
+      The name of the input S3 bucket where the dataset can be found. The
+      job_config.input_path runtime parameter should refer to a path in this
       bucket.
   OutputBucketName:
     Type: String
     Description: >-
-      The name of the output S3 bucket where the cross validation folds will 
-      be written. The job_config.output_prefix runtime parameter should refer 
+      The name of the output S3 bucket where the cross validation folds will
+      be written. The job_config.output_prefix runtime parameter should refer
       to a path in this bucket.
 
 Globals:
@@ -42,7 +42,7 @@ Resources:
 
   CrossValidatorStateMachine:
     Type: AWS::Serverless::StateMachine
-    Description: >
+    Description: >-
       The state machine coordinating the training of cross-validation folds.
     Properties:
       DefinitionUri: statemachine/smx-validator.asl.yaml
@@ -95,7 +95,7 @@ Resources:
               Effect: Allow
               Action:
                 - sagemaker:ListTags
-              Resource: "*"
+              Resource: '*'
             # Pass execution role to SageMaker service
             - Sid: PassRoleToSageMakerPolicy
               Effect: Allow
@@ -111,7 +111,7 @@ Resources:
   BootstrapperFunction:
     Type: AWS::Serverless::Function
     Description: >-
-      This lambda function boostraps the sagemaker crossvalidation training 
+      This lambda function boostraps the sagemaker crossvalidation training
       process.
     Properties:
       CodeUri: functions/bootstrapper
@@ -142,12 +142,12 @@ Resources:
               - sagemaker:CreateTrialComponent
               - sagemaker:UpdateTrialComponent
               - sagemaker:DeleteTrialComponent
-            Resource: "*"
+            Resource: '*'
 
   DatasetSplitterFunction:
     Type: AWS::Serverless::Function
-    Description: >
-      This lambda function splits the input dataset into cross-validation 
+    Description: >-
+      This lambda function splits the input dataset into cross-validation
       folds.
     Properties:
       CodeUri: functions/dataset_splitter/
@@ -166,9 +166,9 @@ Resources:
 
   SplitPreparerFunction:
     Type: AWS::Serverless::Function
-    Description: >
-      This lambda function compiles the hyperparameter template and other 
-      parameters of the current split.
+    Description: >-
+      This lambda function compiles the hyperparameter template and other
+      parameters of the current split
     Properties:
       CodeUri: functions/split_preparer
       Handler: app.lambda_handler
@@ -176,9 +176,9 @@ Resources:
 
   TrainingInfoGetterFunction:
     Type: AWS::Serverless::Function
-    Description: >
+    Description: >-
       This lambda function gets training results and other information
-      after the training has finished.
+      after the training has finished
     Properties:
       CodeUri: functions/training_info_getter/
       Handler: app.lambda_handler
@@ -197,7 +197,7 @@ Resources:
 
   NumpyLayer:
     Type: AWS::Serverless::LayerVersion
-    Description: Lambda layer containing the numpy library.
+    Description: Lambda layer containing the numpy library
     Properties:
       ContentUri: layers/numpy
       CompatibleRuntimes:
@@ -207,7 +207,7 @@ Resources:
 
   S3fsLayer:
     Type: AWS::Serverless::LayerVersion
-    Description: Lambda layer containing the s3fs library.
+    Description: Lambda layer containing the s3fs library and a wrapper class
     Properties:
       ContentUri: layers/s3fs
       CompatibleRuntimes:
@@ -217,7 +217,7 @@ Resources:
 
   SageMakerLayer:
     Type: AWS::Serverless::LayerVersion
-    Description: Lambda layer containing the sagemaker and smexperiments libraries.
+    Description: Lambda layer containing the sagemaker and smexperiments libraries
     Properties:
       ContentUri: layers/sagemaker
       CompatibleRuntimes:
@@ -227,7 +227,7 @@ Resources:
 
   JsonSchemaLayer:
     Type: AWS::Serverless::LayerVersion
-    Description: Lambda layer containing the jsonschema library.
+    Description: Lambda layer containing the jsonschema library
     Properties:
       ContentUri: layers/jsonschema
       CompatibleRuntimes:
@@ -237,7 +237,7 @@ Resources:
 
   ResourcesLayer:
     Type: AWS::Serverless::LayerVersion
-    Description: Lambda layer containing resources.
+    Description: Lambda layer containing resources
     Properties:
       ContentUri: resources
       CompatibleRuntimes:
@@ -257,19 +257,19 @@ Resources:
 
   SageMakerExecutionRole:
     Type: AWS::IAM::Role
-    Description: Execution role for the SageMaker training job.
+    Description: Execution role for the SageMaker training job
     Properties:
       AssumeRolePolicyDocument:
         Statement:
-          - Effect: "Allow"
+          - Effect: Allow
             Principal:
               Service:
-                - "sagemaker.amazonaws.com"
+                - sagemaker.amazonaws.com
             Action:
-              - "sts:AssumeRole"
+              - sts:AssumeRole
       ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
-      Path: "/service-role/"
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+      Path: /service-role/
       Policies:
         - PolicyName: SageMakerS3InputBucketAccess
           PolicyDocument:
@@ -283,8 +283,8 @@ Resources:
                   - s3:GetObjectVersion
                   - s3:GetLifecycleConfiguration
                 Resource:
-                  - !Sub 'arn:aws:s3:::${InputBucketName}'
-                  - !Sub 'arn:aws:s3:::${InputBucketName}/*'
+                  - !Sub arn:aws:s3:::${InputBucketName}
+                  - !Sub arn:aws:s3:::${InputBucketName}/*
         - PolicyName: SageMakerS3OutputBucketAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -295,8 +295,8 @@ Resources:
                   - s3:PutObjectAcl
                   - s3:PutLifecycleConfiguration
                 Resource:
-                  - !Sub 'arn:aws:s3:::${OutputBucketName}'
-                  - !Sub 'arn:aws:s3:::${OutputBucketName}/*'
+                  - !Sub arn:aws:s3:::${OutputBucketName}
+                  - !Sub arn:aws:s3:::${OutputBucketName}/*
       Tags:
         - Key: application
           Value: sagemaker_crossvalidator
