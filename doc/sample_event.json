@@ -2,8 +2,8 @@
     "job_config": {
         "output_prefix": "s3://bucket/output_prefix",
         "input_path": "s3://bucket/path/input.jsonl",
-        "name": "visualclean",
-        "experiment": "visualclean-crossvalidated",
+        "name": "my_project",
+        "experiment": "my_project-crossvalidated",
         "tags": [
             { 
                 "Key": "project",
