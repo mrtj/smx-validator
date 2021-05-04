@@ -16,7 +16,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ['SageMaker', 'machine-learning', 'StepFunctions']
     HomePageUrl: https://github.com/mrtj/smx-validator
-    SemanticVersion: 0.1.0
+    SemanticVersion: 0.1.1
     SourceCodeUrl: https://github.com/mrtj/smx-validator
 
 Parameters:
