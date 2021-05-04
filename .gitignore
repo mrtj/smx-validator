@@ -3,3 +3,4 @@ tests/fixtures
 __pycache__
 samconfig.toml
 packaged.yaml
+.aws-sam
